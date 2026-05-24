@@ -183,7 +183,7 @@ const Cabinet = () => {
                 <form onSubmit={handleRegister} className="space-y-4">
                   <p className="text-sm text-gray-500 mb-2">Создайте аккаунт для подачи заявлений</p>
                   {regError && (
-                    <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded">{regError}</div>
+                    <div className="">{regError}</div>
                   )}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
