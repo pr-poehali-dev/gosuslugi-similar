@@ -1,10 +1,13 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import Icon from "@/components/ui/icon";
+import { useAuth } from "@/context/AuthContext";
 
 const Header = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const location = useLocation();
+  const { user, gosuslugiConnected, logout } = useAuth();
 
   const navLinks = [
     { href: "/catalog", label: "Каталог услуг" },
@@ -28,16 +31,69 @@ const Header = () => {
               <Icon name="Globe" size={14} />
               Официальный портал государственных услуг
             </span>
+            <span className="flex items-center gap-1.5 text-green-300 font-medium text-xs">
+              <Icon name="Lock" size={12} />
+              Защищённый режим
+            </span>
           </div>
           <div className="flex items-center gap-4">
             <a href="tel:+78001000000" className="flex items-center gap-1.5 hover:opacity-80 transition-opacity">
               <Icon name="Phone" size={14} />
               8-800-100-00-00
             </a>
-            <Link to="/cabinet" className="flex items-center gap-1.5 hover:opacity-80 transition-opacity">
-              <Icon name="User" size={14} />
-              Войти
-            </Link>
+            {user ? (
+              <div className="relative">
+                <button
+                  onClick={() => setProfileOpen(!profileOpen)}
+                  className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+                >
+                  <div className="w-6 h-6 bg-white text-[#0d47a1] rounded-full flex items-center justify-center text-xs font-bold">
+                    {user.lastName[0]}{user.firstName[0]}
+                  </div>
+                  <span className="font-medium">{user.lastName} {user.firstName}</span>
+                  <Icon name="ChevronDown" size={14} />
+                </button>
+
+                {profileOpen && (
+                  <div className="absolute right-0 top-8 w-72 bg-white text-gray-800 rounded-lg shadow-xl border border-gray-200 z-50 animate-fade-in">
+                    <div className="p-4 border-b border-gray-100">
+                      <div className="font-bold text-sm">{user.lastName} {user.firstName}</div>
+                      <div className="text-xs text-gray-500 mt-0.5">{user.email}</div>
+                      <div className="text-xs text-gray-500">{user.phone}</div>
+                      {user.snils && <div className="text-xs text-gray-400 mt-0.5">СНИЛС: {user.snils}</div>}
+                      {gosuslugiConnected && (
+                        <div className="mt-2 flex items-center gap-1.5 text-green-600 text-xs font-semibold">
+                          <Icon name="CheckCircle" size={13} />
+                          Госуслуги: вход выполнен
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-2">
+                      <Link
+                        to="/cabinet"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-2 px-3 py-2 rounded text-sm hover:bg-gray-50 transition-colors"
+                      >
+                        <Icon name="User" size={15} className="text-[#0d47a1]" />
+                        Личный кабинет
+                      </Link>
+                      <button
+                        onClick={() => { logout(); setProfileOpen(false); }}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded text-sm hover:bg-red-50 text-red-600 transition-colors"
+                      >
+                        <Icon name="LogOut" size={15} />
+                        Выйти
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <Link to="/cabinet" className="flex items-center gap-1.5 hover:opacity-80 transition-opacity">
+                <Icon name="User" size={14} />
+                Войти
+              </Link>
+            )}
           </div>
         </div>
       </div>
@@ -71,13 +127,25 @@ const Header = () => {
             </div>
 
             <div className="flex items-center gap-3">
-              <Link
-                to="/cabinet"
-                className="hidden md:flex items-center gap-2 bg-[#0d47a1] text-white px-4 py-2.5 rounded text-sm font-medium hover:bg-[#1565c0] transition-colors"
-              >
-                <Icon name="LogIn" size={16} />
-                Войти / Зарегистрироваться
-              </Link>
+              {user ? (
+                <div className="hidden md:flex flex-col items-end gap-0.5">
+                  <span className="text-sm font-semibold text-gray-800">{user.lastName} {user.firstName}</span>
+                  {gosuslugiConnected && (
+                    <span className="text-xs text-green-600 font-semibold flex items-center gap-1">
+                      <Icon name="CheckCircle" size={11} />
+                      Госуслуги: вход выполнен
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <Link
+                  to="/cabinet"
+                  className="hidden md:flex items-center gap-2 bg-[#0d47a1] text-white px-4 py-2.5 rounded text-sm font-medium hover:bg-[#1565c0] transition-colors"
+                >
+                  <Icon name="LogIn" size={16} />
+                  Войти / Зарегистрироваться
+                </Link>
+              )}
               <button
                 className="md:hidden p-2 text-[#0d47a1]"
                 onClick={() => setMobileOpen(!mobileOpen)}
@@ -122,6 +190,17 @@ const Header = () => {
                 className="w-full border border-gray-300 rounded px-4 py-2.5 text-sm focus:outline-none focus:border-[#0d47a1]"
               />
             </div>
+            {user && (
+              <div className="bg-blue-50 rounded p-3 mb-3 text-sm">
+                <div className="font-semibold text-gray-800">{user.lastName} {user.firstName}</div>
+                <div className="text-gray-500 text-xs">{user.email}</div>
+                {gosuslugiConnected && (
+                  <div className="text-green-600 text-xs font-semibold mt-1 flex items-center gap-1">
+                    <Icon name="CheckCircle" size={11} /> Госуслуги: вход выполнен
+                  </div>
+                )}
+              </div>
+            )}
             <ul className="space-y-1">
               {navLinks.map((link) => (
                 <li key={link.href}>
