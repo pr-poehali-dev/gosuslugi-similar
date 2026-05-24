@@ -1,81 +1,102 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import {
+  apiRegister, apiLogin, apiLogout, apiMe,
+  apiConnectGosuslugi, apiGetApplications,
+  apiCreateApplication, apiDeleteApplication,
+  UserAPI, ApplicationAPI
+} from "@/api";
 
-export interface UserProfile {
-  lastName: string;
-  firstName: string;
-  phone: string;
-  email: string;
-  snils: string;
-}
-
-export interface Application {
-  id: string;
-  title: string;
-  status: string;
-  statusColor: "yellow" | "green" | "red";
-  date: string;
-  source: "site" | "gosuslugi";
-}
+export type UserProfile = UserAPI;
+export type Application = ApplicationAPI;
 
 interface AuthContextType {
   user: UserProfile | null;
   gosuslugiConnected: boolean;
   applications: Application[];
-  login: (profile: UserProfile) => void;
-  logout: () => void;
-  connectGosuslugi: (phone: string, password: string) => Promise<boolean>;
-  addApplication: (title: string) => void;
-  deleteApplication: (id: string) => void;
+  loading: boolean;
+  login: (loginStr: string, password: string) => Promise<void>;
+  register: (data: { lastName: string; firstName: string; phone: string; email: string; snils: string; password: string }) => Promise<void>;
+  logout: () => Promise<void>;
+  connectGosuslugi: (phone: string, password: string) => Promise<void>;
+  addApplication: (title: string, source?: "site" | "gosuslugi") => Promise<void>;
+  deleteApplication: (id: string) => Promise<void>;
+  reloadApplications: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [gosuslugiConnected, setGosuslugiConnected] = useState(false);
   const [applications, setApplications] = useState<Application[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const login = (profile: UserProfile) => {
-    setUser(profile);
+  const gosuslugiConnected = user?.gosuslugiConnected ?? false;
+
+  useEffect(() => {
+    const token = localStorage.getItem("ru_session_token");
+    if (!token) { setLoading(false); return; }
+    apiMe().then((u) => {
+      if (u) {
+        setUser(u);
+        apiGetApplications().then(setApplications);
+      } else {
+        localStorage.removeItem("ru_session_token");
+      }
+    }).finally(() => setLoading(false));
+  }, []);
+
+  const login = async (loginStr: string, password: string) => {
+    const { token, user: u } = await apiLogin(loginStr, password);
+    localStorage.setItem("ru_session_token", token);
+    setUser(u);
+    const apps = await apiGetApplications();
+    setApplications(apps);
   };
 
-  const logout = () => {
-    setUser(null);
-    setGosuslugiConnected(false);
+  const register = async (data: { lastName: string; firstName: string; phone: string; email: string; snils: string; password: string }) => {
+    const { token, user: u } = await apiRegister(data);
+    localStorage.setItem("ru_session_token", token);
+    setUser(u);
     setApplications([]);
   };
 
-  const connectGosuslugi = async (phone: string, password: string): Promise<boolean> => {
-    await new Promise((r) => setTimeout(r, 1800));
-    if (phone.length >= 10 && password.length >= 4) {
-      setGosuslugiConnected(true);
-      setApplications([
-        { id: "GU-2024-003812", title: "Загранпаспорт нового образца", status: "В обработке", statusColor: "yellow", date: "15 мая 2024", source: "gosuslugi" },
-        { id: "GU-2024-002210", title: "Регистрация по месту жительства", status: "Выполнено", statusColor: "green", date: "2 апреля 2024", source: "gosuslugi" },
-      ]);
-      return true;
-    }
-    return false;
+  const logout = async () => {
+    await apiLogout();
+    setUser(null);
+    setApplications([]);
   };
 
-  const addApplication = (title: string) => {
-    const newApp: Application = {
-      id: `RU-${Date.now()}`,
-      title,
-      status: "Принято",
-      statusColor: "yellow",
-      date: new Date().toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" }),
-      source: "site",
-    };
-    setApplications((prev) => [newApp, ...prev]);
+  const connectGosuslugi = async (phone: string, password: string) => {
+    await apiConnectGosuslugi(phone, password);
+    const updated = await apiMe();
+    if (updated) setUser(updated);
+    const apps = await apiGetApplications();
+    setApplications(apps);
   };
 
-  const deleteApplication = (id: string) => {
-    setApplications((prev) => prev.filter((a) => a.id !== id));
+  const addApplication = async (title: string, source: "site" | "gosuslugi" = "gosuslugi") => {
+    const app = await apiCreateApplication(title, source);
+    setApplications((prev) => [app, ...prev]);
+  };
+
+  const deleteApplication = async (id: string) => {
+    await apiDeleteApplication(id);
+    setApplications((prev) =>
+      prev.map((a) => a.id === id ? { ...a, status: "Отозвано", statusColor: "red" as const } : a)
+    );
+  };
+
+  const reloadApplications = async () => {
+    const apps = await apiGetApplications();
+    setApplications(apps);
   };
 
   return (
-    <AuthContext.Provider value={{ user, gosuslugiConnected, applications, login, logout, connectGosuslugi, addApplication, deleteApplication }}>
+    <AuthContext.Provider value={{
+      user, gosuslugiConnected, applications, loading,
+      login, register, logout, connectGosuslugi,
+      addApplication, deleteApplication, reloadApplications
+    }}>
       {children}
     </AuthContext.Provider>
   );

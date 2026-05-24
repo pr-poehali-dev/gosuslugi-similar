@@ -78,7 +78,7 @@ const Header = () => {
                         Личный кабинет
                       </Link>
                       <button
-                        onClick={() => { logout(); setProfileOpen(false); }}
+                        onClick={async () => { await logout(); setProfileOpen(false); }}
                         className="w-full flex items-center gap-2 px-3 py-2 rounded text-sm hover:bg-red-50 text-red-600 transition-colors"
                       >
                         <Icon name="LogOut" size={15} />

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import Icon from "@/components/ui/icon";
 import { useAuth } from "@/context/AuthContext";
 
@@ -138,7 +138,7 @@ const ApplicationModal = ({
 }: {
   service: Service;
   onClose: () => void;
-  onSubmit: (title: string) => void;
+  onSubmit: (title: string) => Promise<void>;
 }) => {
   const { user, gosuslugiConnected } = useAuth();
   const [step, setStep] = useState<"form" | "checking" | "done" | "nogu">(
@@ -146,12 +146,19 @@ const ApplicationModal = ({
   );
   const [formData, setFormData] = useState<Record<string, string>>({});
 
+  const [submitError, setSubmitError] = useState("");
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setStep("checking");
-    await new Promise((r) => setTimeout(r, 2000));
-    setStep("done");
-    onSubmit(service.title);
+    setSubmitError("");
+    try {
+      await onSubmit(service.title);
+      setStep("done");
+    } catch (err: unknown) {
+      setSubmitError(err instanceof Error ? err.message : "Ошибка отправки");
+      setStep("form");
+    }
   };
 
   return (
@@ -201,6 +208,9 @@ const ApplicationModal = ({
                 <Icon name="CheckCircle" size={15} />
                 <span>Госуслуги подключены — данные будут проверены автоматически</span>
               </div>
+              {submitError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded">{submitError}</div>
+              )}
               {service.fields.map((field: Field) => (
                 <div key={field.label}>
                   <label className="block text-sm font-medium text-gray-700 mb-1">{field.label}</label>
@@ -293,7 +303,6 @@ const Catalog = () => {
   const [sortBy, setSortBy] = useState("popular");
   const [activeService, setActiveService] = useState<Service | null>(null);
   const { addApplication } = useAuth();
-  const navigate = useNavigate();
 
   const filtered = allServices.filter((s) => {
     const matchCat = activeCategory === "Все" || s.category === activeCategory;
@@ -306,8 +315,8 @@ const Catalog = () => {
     return a.title.localeCompare(b.title);
   });
 
-  const handleApplicationSubmit = (title: string) => {
-    addApplication(title);
+  const handleApplicationSubmit = async (title: string) => {
+    await addApplication(title, "gosuslugi");
   };
 
   return (

@@ -1,0 +1,17 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS CORS",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "POST без токена → 401",
+      "method": "POST",
+      "path": "/",
+      "body": {"phone": "+79001234567", "password": "testpass"},
+      "expectedStatus": 401
+    }
+  ]
+}

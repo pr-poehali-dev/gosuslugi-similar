@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Icon from "@/components/ui/icon";
 import { useAuth } from "@/context/AuthContext";
+// loading state поддерживается через useAuth
 
 const statusColor: Record<string, string> = {
   yellow: "bg-yellow-50 text-yellow-700 border-yellow-200",
@@ -10,7 +11,7 @@ const statusColor: Record<string, string> = {
 };
 
 const Cabinet = () => {
-  const { user, gosuslugiConnected, applications, login, logout, connectGosuslugi, deleteApplication } = useAuth();
+  const { user, gosuslugiConnected, applications, loading, login, logout, register, connectGosuslugi, deleteApplication } = useAuth();
   const navigate = useNavigate();
 
   const [mode, setMode] = useState<"login" | "register">("login");
@@ -18,34 +19,43 @@ const Cabinet = () => {
   // Login form
   const [loginForm, setLoginForm] = useState({ emailOrPhone: "", password: "" });
   const [loginError, setLoginError] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
 
   // Register form
   const [regForm, setRegForm] = useState({ lastName: "", firstName: "", phone: "", email: "", snils: "", password: "", password2: "" });
   const [regError, setRegError] = useState("");
+  const [regLoading, setRegLoading] = useState(false);
 
   // Gosuslugi connect
   const [guForm, setGuForm] = useState({ phone: "", password: "" });
   const [guLoading, setGuLoading] = useState(false);
   const [guError, setGuError] = useState("");
-  const [guSuccess, setGuSuccess] = useState(false);
 
   // Application modal
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!loginForm.emailOrPhone || !loginForm.password) {
       setLoginError("Заполните все поля");
       return;
     }
-    // Demo: accept any credentials
-    login({ lastName: "Петров", firstName: "Иван", phone: loginForm.emailOrPhone, email: loginForm.emailOrPhone, snils: "" });
-    navigate("/cabinet");
+    setLoginLoading(true);
+    setLoginError("");
+    try {
+      await login(loginForm.emailOrPhone, loginForm.password);
+      navigate("/cabinet");
+    } catch (err: unknown) {
+      setLoginError(err instanceof Error ? err.message : "Ошибка входа");
+    } finally {
+      setLoginLoading(false);
+    }
   };
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!regForm.lastName || !regForm.firstName || !regForm.phone || !regForm.email) {
+    if (!regForm.lastName || !regForm.firstName || !regForm.phone || !regForm.email || !regForm.password) {
       setRegError("Заполните обязательные поля");
       return;
     }
@@ -53,22 +63,45 @@ const Cabinet = () => {
       setRegError("Пароли не совпадают");
       return;
     }
-    login({ lastName: regForm.lastName, firstName: regForm.firstName, phone: regForm.phone, email: regForm.email, snils: regForm.snils });
-    navigate("/cabinet");
+    if (regForm.password.length < 6) {
+      setRegError("Пароль должен содержать не менее 6 символов");
+      return;
+    }
+    setRegLoading(true);
+    setRegError("");
+    try {
+      await register({ lastName: regForm.lastName, firstName: regForm.firstName, phone: regForm.phone, email: regForm.email, snils: regForm.snils, password: regForm.password });
+      navigate("/cabinet");
+    } catch (err: unknown) {
+      setRegError(err instanceof Error ? err.message : "Ошибка регистрации");
+    } finally {
+      setRegLoading(false);
+    }
   };
 
   const handleConnectGosuslugi = async (e: React.FormEvent) => {
     e.preventDefault();
     setGuError("");
     setGuLoading(true);
-    const ok = await connectGosuslugi(guForm.phone, guForm.password);
-    setGuLoading(false);
-    if (ok) {
-      setGuSuccess(true);
-    } else {
-      setGuError("Аккаунт не найден. Проверьте телефон и пароль от Госуслуг.");
+    try {
+      await connectGosuslugi(guForm.phone, guForm.password);
+    } catch (err: unknown) {
+      setGuError(err instanceof Error ? err.message : "Аккаунт не найден");
+    } finally {
+      setGuLoading(false);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Icon name="Loader" size={36} className="text-[#0d47a1] animate-spin mx-auto mb-3" />
+          <p className="text-gray-500 text-sm">Загрузка...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Not logged in
   if (!user) {
@@ -140,8 +173,9 @@ const Cabinet = () => {
                       className="w-full border border-gray-300 rounded px-3 py-2.5 text-sm focus:outline-none focus:border-[#0d47a1]"
                     />
                   </div>
-                  <button type="submit" className="w-full bg-[#0d47a1] text-white py-3 rounded font-semibold hover:bg-[#1565c0] transition-colors">
-                    Войти
+                  <button type="submit" disabled={loginLoading} className="w-full bg-[#0d47a1] text-white py-3 rounded font-semibold hover:bg-[#1565c0] transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
+                    {loginLoading && <Icon name="Loader" size={16} className="animate-spin" />}
+                    {loginLoading ? "Вход..." : "Войти"}
                   </button>
                   <button type="button" className="w-full text-center text-sm text-[#0d47a1] hover:underline">Забыли пароль?</button>
                 </form>
@@ -225,8 +259,9 @@ const Cabinet = () => {
                       className="w-full border border-gray-300 rounded px-3 py-2.5 text-sm focus:outline-none focus:border-[#0d47a1]"
                     />
                   </div>
-                  <button type="submit" className="w-full bg-[#0d47a1] text-white py-3 rounded font-semibold hover:bg-[#1565c0] transition-colors">
-                    Зарегистрироваться
+                  <button type="submit" disabled={regLoading} className="w-full bg-[#0d47a1] text-white py-3 rounded font-semibold hover:bg-[#1565c0] transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
+                    {regLoading && <Icon name="Loader" size={16} className="animate-spin" />}
+                    {regLoading ? "Регистрация..." : "Зарегистрироваться"}
                   </button>
                 </form>
               )}
@@ -477,9 +512,14 @@ const Cabinet = () => {
                 Отмена
               </button>
               <button
-                onClick={() => { deleteApplication(deleteConfirm); setDeleteConfirm(null); }}
-                className="flex-1 bg-red-600 text-white py-2.5 rounded font-medium hover:bg-red-700 transition-colors text-sm"
+                disabled={deleteLoading}
+                onClick={async () => {
+                  setDeleteLoading(true);
+                  try { await deleteApplication(deleteConfirm); } finally { setDeleteLoading(false); setDeleteConfirm(null); }
+                }}
+                className="flex-1 bg-red-600 text-white py-2.5 rounded font-medium hover:bg-red-700 transition-colors text-sm flex items-center justify-center gap-2 disabled:opacity-60"
               >
+                {deleteLoading && <Icon name="Loader" size={14} className="animate-spin" />}
                 Удалить
               </button>
             </div>
